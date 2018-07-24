@@ -132,6 +132,65 @@ HexToBase64(char* HexString, memory_index Length)
 		++C;
 	}
 
+	Result[Base64StringLength] = 0;
+	return(Result);
+}
+
+inline u8
+ByteFromTwoHex(char A, char B)
+{
+	u8 Top = HexCharToByte(A) << 4;
+	u8 Bottom = HexCharToByte(B) & 0x0F;
+	return(Top | Bottom);
+}
+
+// NOTE(hugo): This functions _always_
+// output lowercase for a->f
+inline char
+HexCharFromByte(u8 Byte)
+{
+	Assert(Byte <= 0xF);
+	if(Byte < 10)
+	{
+		return(Byte + '0');
+	}
+	else
+	{
+		return(Byte - 10 + 'a');
+	}
+}
+
+inline void
+CharHexFromByte(u8 Byte, char* A, char* B)
+{
+	u8 Top = Byte >> 4;
+	u8 Bottom = Byte & 0x0F;
+	*A = HexCharFromByte(Top);
+	*B = HexCharFromByte(Bottom);
+}
+
+internal char*
+FixedXOR(char* InputA, char* InputB, memory_index Length)
+{
+	char* Result = AllocateArray(char, Length + 1);
+	char* CharResult = Result;
+
+	for(memory_index CharIndex = 0; CharIndex < Length - 1; CharIndex += 2)
+	{
+		char CharA0 = InputA[CharIndex];
+		char CharA1 = InputA[CharIndex + 1];
+
+		char CharB0 = InputB[CharIndex];
+		char CharB1 = InputB[CharIndex + 1];
+
+		u8 ByteA = ByteFromTwoHex(CharA0, CharA1);
+		u8 ByteB = ByteFromTwoHex(CharB0, CharB1);
+		u8 ByteResult = ByteA ^ ByteB;
+		CharHexFromByte(ByteResult, CharResult, CharResult + 1);
+		CharResult += 2;
+	}
+
+	Result[Length] = 0;
 	return(Result);
 }
 
@@ -145,10 +204,30 @@ Test_Set1_Challenge1()
 
 	Assert(strlen(ExpectedResult) == strlen(Result));
 	Assert(strcmp(Result, ExpectedResult) == 0);
+
+	Free(Result);
+}
+
+internal void
+Test_Set1_Challenge2()
+{
+	char* InputA = "1c0111001f010100061a024b53535009181c";
+	memory_index Length = strlen(InputA);
+	char* InputB = "686974207468652062756c6c277320657965";
+	memory_index LengthB = strlen(InputB);
+	Assert(LengthB == Length);
+	char* Expected = "746865206b696420646f6e277420706c6179";
+	char* Result = FixedXOR(InputA, InputB, Length);
+
+	Assert(strlen(Result) == strlen(Expected));
+	Assert(strcmp(Result, Expected) == 0);
+
+	Free(Result);
 }
 
 int main(int ArgumentCount, char** Arguments)
 {
 	Test_Set1_Challenge1();
+	Test_Set1_Challenge2();
 	return(0);
 }
