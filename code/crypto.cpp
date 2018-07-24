@@ -194,6 +194,67 @@ FixedXOR(char* InputA, char* InputB, memory_index Length)
 	return(Result);
 }
 
+inline bool
+IsLetterOrNumber(char C)
+{
+	bool IsLetter = (C >= 'a' && C <= 'z') ||
+		(C >= 'A' && C <= 'Z');
+	bool IsNumber = (C >= '0' && C <= '9');
+	return(IsLetter || IsNumber);
+}
+
+internal float
+XORCypher_ComputeScore(char* Str, memory_index Length)
+{
+	// NOTE(hugo): For now, compute the amount of letters
+	// and numbers inside the string.
+	float Score = 0;
+	for(memory_index CharIndex = 0; CharIndex < Length; ++CharIndex)
+	{
+		char* C = Str + CharIndex;
+		if(IsLetterOrNumber(*C))
+		{
+			++Score;
+		}
+	}
+	return(Score);
+}
+
+internal char*
+SingleByteXORCypher(char* Input, memory_index Length)
+{
+	Assert(Length % 2 == 0);
+	char* BestScoreResult = AllocateArray(char, Length / 2 + 1);
+	float BestScore = 0;
+	char* CurrentString = AllocateArray(char, Length / 2 + 1);
+
+	for(u32 CharIndex = 0; CharIndex < 0xFF; ++CharIndex)
+	{
+		u8 CipherByte = CharIndex & 0xFF;
+
+		char* C = CurrentString;
+		for(memory_index Index = 0; Index < Length - 1; Index += 2)
+		{
+			u8 InputByte = ByteFromTwoHex(Input[Index], Input[Index + 1]);
+			u8 ByteResult = InputByte ^ CipherByte;
+			*C = ByteResult;
+			++C;
+		}
+		float Score = XORCypher_ComputeScore(CurrentString, strlen(CurrentString));
+		if(Score > BestScore)
+		{
+			BestScore = Score;
+			memcpy(BestScoreResult, CurrentString, Length / 2 + 1);
+		}
+		memset(CurrentString, 0, Length / 2 + 1);
+	}
+
+	BestScoreResult[Length] = 0;
+	Free(CurrentString);
+	Assert(BestScore != 0);
+	return(BestScoreResult);
+}
+
 internal void
 Test_Set1_Challenge1()
 {
@@ -225,9 +286,21 @@ Test_Set1_Challenge2()
 	Free(Result);
 }
 
+internal void
+Test_Set1_Challenge3()
+{
+	char* Input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
+	memory_index Length = strlen(Input);
+	char* Result = SingleByteXORCypher(Input, Length);
+	printf("Result of Set1/Challenge3: %s\n", Result);
+
+	Free(Result);
+}
+
 int main(int ArgumentCount, char** Arguments)
 {
 	Test_Set1_Challenge1();
 	Test_Set1_Challenge2();
+	Test_Set1_Challenge3();
 	return(0);
 }
