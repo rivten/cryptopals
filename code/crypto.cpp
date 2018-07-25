@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h> // NOTE(hugo) : for memset
 
+#include <math.h>
+
 #ifdef __unix__
 #include <sys/types.h>
 #endif
@@ -62,6 +64,15 @@ void* ReAllocate_(void* Buffer, size_t Size)
 	return(Result);
 }
 // }
+
+
+#define MAX(a, b) ((a) > (b)) ? (a) : (b)
+
+inline float
+Square(float V)
+{
+	return(V * V);
+}
 
 inline u8
 HexCharToByte(char C)
@@ -195,7 +206,7 @@ FixedXOR(char* InputA, char* InputB, memory_index Length)
 }
 
 inline bool
-IsLetterOrNumber(char C)
+IsAlphanumerical(char C)
 {
 	bool IsLetter = (C >= 'a' && C <= 'z') ||
 		(C >= 'A' && C <= 'Z');
@@ -203,21 +214,87 @@ IsLetterOrNumber(char C)
 	return(IsLetter || IsNumber);
 }
 
-internal float
-XORCypher_ComputeScore(char* Str, memory_index Length)
+inline bool
+IsAlphabetical(char C)
 {
-	// NOTE(hugo): For now, compute the amount of letters
-	// and numbers inside the string.
-	float Score = 0;
-	for(memory_index CharIndex = 0; CharIndex < Length; ++CharIndex)
+	bool Result = (C >= 'a' && C <= 'z') || (C >= 'A' && C <= 'Z');
+	return(Result);
+}
+
+inline char
+ToLower(char C)
+{
+	Assert(IsAlphabetical(C));
+	if(C >= 'A' && C <= 'Z')
 	{
-		char* C = Str + CharIndex;
-		if(IsLetterOrNumber(*C))
+		C = C - 'A' + 'a';
+	}
+
+	return(C);
+}
+
+inline bool
+IsEnglishCharacter(char C)
+{
+	return(IsAlphanumerical(C) || C == ' ');
+}
+
+global_variable float EnglishLetterFrequency[26] = 
+{
+    0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015,  // A-G
+    0.06094, 0.06966, 0.00153, 0.00772, 0.04025, 0.02406, 0.06749,  // H-N
+    0.07507, 0.01929, 0.00095, 0.05987, 0.06327, 0.09056, 0.02758,  // O-U
+    0.00978, 0.02360, 0.00150, 0.01974, 0.00074                     // V-Z
+};
+
+internal float
+XORCypher_ComputeScore(char* Str, memory_index Length, memory_index InputLength)
+{
+	float ChiSquare = 0.0f;
+
+	u32 StrLetterSize = 0;
+	u32 BadLetter = 0;
+	for(u32 Index = 0; Index < Length; ++Index)
+	{
+		char C = Str[Index];
+		if(IsAlphabetical(C))
 		{
-			++Score;
+			++StrLetterSize;
+		}
+		else if(!IsEnglishCharacter(C))
+		{
+			++BadLetter;
 		}
 	}
-	return(Score);
+
+	if(StrLetterSize == 0)
+	{
+		return(0.0f);
+	}
+
+	for(u32 LetterIndex = 0; LetterIndex < 26; ++LetterIndex)
+	{
+		u32 ObservationCount = 0;
+		char CurrentChar = 'a' + LetterIndex;
+		for(u32 Index = 0; Index < Length; ++Index)
+		{
+			char C = Str[Index];
+			if(IsAlphabetical(C) &&
+					ToLower(C) == CurrentChar)
+			{
+				++ObservationCount;
+			}
+		}
+
+		float ExpectedCount = float(StrLetterSize) * EnglishLetterFrequency[LetterIndex];
+		ChiSquare += Square(float(ObservationCount) - ExpectedCount) / ExpectedCount;
+	}
+
+	float t = (1.0f + float(BadLetter)) *
+		(1.0f + fabs(float(InputLength - Length))) * ChiSquare;
+	float FinalScore = 1.0f / (1.0f + t);
+
+	return(FinalScore);
 }
 
 internal char*
@@ -228,7 +305,7 @@ SingleByteXORCypher(char* Input, memory_index Length)
 	float BestScore = 0;
 	char* CurrentString = AllocateArray(char, Length / 2 + 1);
 
-	for(u32 CharIndex = 0; CharIndex < 0xFF; ++CharIndex)
+	for(u32 CharIndex = 0; CharIndex <= 0xFF; ++CharIndex)
 	{
 		u8 CipherByte = CharIndex & 0xFF;
 
@@ -240,7 +317,8 @@ SingleByteXORCypher(char* Input, memory_index Length)
 			*C = ByteResult;
 			++C;
 		}
-		float Score = XORCypher_ComputeScore(CurrentString, strlen(CurrentString));
+		float Score = XORCypher_ComputeScore(CurrentString, strlen(CurrentString),
+				Length / 2);
 		if(Score > BestScore)
 		{
 			BestScore = Score;
