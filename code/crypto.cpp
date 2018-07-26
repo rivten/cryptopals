@@ -74,6 +74,29 @@ Square(float V)
 	return(V * V);
 }
 
+char* ReadFileContent(const char* Filename)
+{
+#ifdef _WIN32
+	FILE* File = 0;
+	fopen_s(&File, Filename, "rb");
+#else
+	FILE* File = fopen(Filename, "rb");
+#endif
+	Assert(File);
+
+	fseek(File, 0, SEEK_END);
+	size_t FileSize = ftell(File);
+	fseek(File, 0, SEEK_SET);
+	char* Content = AllocateArray(char, FileSize + 1);
+	size_t ReadSize = fread(Content, 1, FileSize, File);
+	Assert(ReadSize == FileSize);
+	fclose(File);
+
+	Content[FileSize] = 0;
+
+	return(Content);
+}
+
 inline u8
 HexCharToByte(char C)
 {
@@ -297,12 +320,19 @@ XORCypher_ComputeScore(char* Str, memory_index Length, memory_index InputLength)
 	return(FinalScore);
 }
 
-internal char*
+struct xor_decipher_result
+{
+	float Score;
+	char* DecodedStr;
+};
+
+internal xor_decipher_result
 SingleByteXORCypher(char* Input, memory_index Length)
 {
 	Assert(Length % 2 == 0);
-	char* BestScoreResult = AllocateArray(char, Length / 2 + 1);
-	float BestScore = 0;
+	xor_decipher_result Result = {};
+	Result.DecodedStr = AllocateArray(char, Length / 2 + 1);
+
 	char* CurrentString = AllocateArray(char, Length / 2 + 1);
 
 	for(u32 CharIndex = 0; CharIndex <= 0xFF; ++CharIndex)
@@ -319,17 +349,51 @@ SingleByteXORCypher(char* Input, memory_index Length)
 		}
 		float Score = XORCypher_ComputeScore(CurrentString, strlen(CurrentString),
 				Length / 2);
-		if(Score > BestScore)
+		if(Score > Result.Score)
 		{
-			BestScore = Score;
-			memcpy(BestScoreResult, CurrentString, Length / 2 + 1);
+			Result.Score = Score;
+			memcpy(Result.DecodedStr, CurrentString, Length / 2 + 1);
 		}
 		memset(CurrentString, 0, Length / 2 + 1);
 	}
 
-	BestScoreResult[Length] = 0;
+	Result.DecodedStr[Length] = 0;
 	Free(CurrentString);
-	Assert(BestScore != 0);
+	Assert(Result.Score != 0);
+	return(Result);
+}
+
+inline memory_index
+GetLineLength(char* Str)
+{
+	memory_index Result = 0;
+	char* C = Str;
+	while(C && *C != '\r' && (C + 1) && C[1] != '\n')
+	{
+		++Result;
+		++C;
+	}
+	return(Result);
+}
+
+internal char*
+DecryptFile(char* FileContent)
+{
+	char* CurrentFilePos = FileContent;
+	float BestScore = 0;
+	char* BestScoreResult = 0;
+	while(*CurrentFilePos != 0)
+	{
+		memory_index LineLength = GetLineLength(CurrentFilePos);
+		xor_decipher_result DecipherResult = SingleByteXORCypher(CurrentFilePos, LineLength);
+		if(BestScore < DecipherResult.Score)
+		{
+			BestScore = DecipherResult.Score;
+			BestScoreResult = DecipherResult.DecodedStr;
+		}
+
+		CurrentFilePos += (LineLength + 2);
+	}
 	return(BestScoreResult);
 }
 
@@ -369,8 +433,20 @@ Test_Set1_Challenge3()
 {
 	char* Input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
 	memory_index Length = strlen(Input);
-	char* Result = SingleByteXORCypher(Input, Length);
-	printf("Result of Set1/Challenge3: %s\n", Result);
+	xor_decipher_result Result = SingleByteXORCypher(Input, Length);
+	printf("Result of Set1/Challenge3: %s\n", Result.DecodedStr);
+
+	Free(Result.DecodedStr);
+}
+
+internal void
+Test_Set1_Challenge4()
+{
+	char* InputFilename = "../data/4.txt";
+	char* FileContent = ReadFileContent(InputFilename);
+	char* Result = DecryptFile(FileContent);
+	Free(FileContent);
+	printf("Result of Set1/Challenge4: %s\n", Result);
 
 	Free(Result);
 }
@@ -380,5 +456,6 @@ int main(int ArgumentCount, char** Arguments)
 	Test_Set1_Challenge1();
 	Test_Set1_Challenge2();
 	Test_Set1_Challenge3();
+	Test_Set1_Challenge4();
 	return(0);
 }
