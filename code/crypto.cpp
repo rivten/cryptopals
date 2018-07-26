@@ -397,6 +397,30 @@ DecryptFile(char* FileContent)
 	return(BestScoreResult);
 }
 
+internal char*
+RepeatingKeyXOR(char* Input, memory_index Length, char* Key, memory_index KeyLength)
+{
+	char* Result = AllocateArray(char, 2 * Length + 1);
+	char* ResultC = Result;
+
+	for(u32 CharIndex = 0; CharIndex < Length; ++CharIndex)
+	{
+		char C = Input[CharIndex];
+		char KeyChar = Key[CharIndex % KeyLength];
+		u8 Byte = C ^ KeyChar;
+		CharHexFromByte(Byte, ResultC, ResultC + 1);
+		ResultC += 2;
+	}
+
+	Result[2 * Length] = 0;
+	return(Result);
+}
+
+#define ASSERT_STR_IDENTICAL(A, B)\
+	Assert(A); Assert(B);\
+	Assert(strlen(A) == strlen(B));\
+	Assert(strcmp((A), (B)) == 0);
+
 internal void
 Test_Set1_Challenge1()
 {
@@ -405,8 +429,7 @@ Test_Set1_Challenge1()
 	char* ExpectedResult = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
 	char* Result = HexToBase64(Input, Length);
 
-	Assert(strlen(ExpectedResult) == strlen(Result));
-	Assert(strcmp(Result, ExpectedResult) == 0);
+	ASSERT_STR_IDENTICAL(Result, ExpectedResult);
 
 	Free(Result);
 }
@@ -422,8 +445,7 @@ Test_Set1_Challenge2()
 	char* Expected = "746865206b696420646f6e277420706c6179";
 	char* Result = FixedXOR(InputA, InputB, Length);
 
-	Assert(strlen(Result) == strlen(Expected));
-	Assert(strcmp(Result, Expected) == 0);
+	ASSERT_STR_IDENTICAL(Result, Expected);
 
 	Free(Result);
 }
@@ -451,11 +473,30 @@ Test_Set1_Challenge4()
 	Free(Result);
 }
 
+internal void
+Test_Set1_Challenge5()
+{
+	char* Input = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+	memory_index Length = strlen(Input);
+
+	char* Key = "ICE";
+	memory_index KeyLength = strlen(Key);
+
+	char* Result = RepeatingKeyXOR(Input, Length, Key, KeyLength);
+
+	char* Expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
+	ASSERT_STR_IDENTICAL(Result, Expected);
+
+	Free(Result);
+}
+
 int main(int ArgumentCount, char** Arguments)
 {
 	Test_Set1_Challenge1();
 	Test_Set1_Challenge2();
 	Test_Set1_Challenge3();
 	Test_Set1_Challenge4();
+	Test_Set1_Challenge5();
 	return(0);
 }
