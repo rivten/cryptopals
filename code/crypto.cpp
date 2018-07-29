@@ -363,12 +363,18 @@ SingleByteXORCypher(char* Input, memory_index Length)
 	return(Result);
 }
 
+inline bool
+IsEndLine(char* C)
+{
+	return((C && *C == '\r' && (C + 1) && C[1] == '\n') || (C && *C == '\n'));
+}
+
 inline memory_index
 GetLineLength(char* Str)
 {
 	memory_index Result = 0;
 	char* C = Str;
-	while(C && *C != '\r' && (C + 1) && C[1] != '\n')
+	while(!IsEndLine(C))
 	{
 		++Result;
 		++C;
@@ -392,7 +398,11 @@ DecryptFile(char* FileContent)
 			BestScoreResult = DecipherResult.DecodedStr;
 		}
 
-		CurrentFilePos += (LineLength + 2);
+		CurrentFilePos += (LineLength + 1);
+		if(*CurrentFilePos == '\n')
+		{
+			++CurrentFilePos;
+		}
 	}
 	return(BestScoreResult);
 }
