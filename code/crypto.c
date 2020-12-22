@@ -1,8 +1,9 @@
 #include <stdio.h>
 
-#include <cstdint>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h> // NOTE(hugo) : for memset
+#include <stdbool.h>
 
 #include <math.h>
 
@@ -44,7 +45,7 @@ typedef size_t memory_index;
 #define ReAllocateArray(Buffer, type, Size) (type *)ReAllocate_(Buffer, (Size) * sizeof(type))
 #define AllocateArray(type, Size) (type *)Allocate_((Size) * sizeof(type))
 #define AllocateStruct(type) AllocateArray(type, 1)
-#define Free(Buffer) free(Buffer)
+#define Free(Buffer) free(Buffer);
 #define CopyArray(Dest, Source, type, Size) memcpy(Dest, Source, (Size) * sizeof(type))
 
 void* Allocate_(size_t Size)
@@ -68,13 +69,12 @@ void* ReAllocate_(void* Buffer, size_t Size)
 
 #define MAX(a, b) ((a) > (b)) ? (a) : (b)
 
-inline float
-Square(float V)
+float Square(float V)
 {
 	return(V * V);
 }
 
-char* ReadFileContent(const char* Filename)
+const char* ReadFileContent(const char* Filename)
 {
 #ifdef _WIN32
 	FILE* File = 0;
@@ -88,7 +88,7 @@ char* ReadFileContent(const char* Filename)
 	size_t FileSize = ftell(File);
 	fseek(File, 0, SEEK_SET);
 	char* Content = AllocateArray(char, FileSize + 1);
-	size_t ReadSize = fread(Content, 1, FileSize, File);
+	const size_t ReadSize = fread(Content, 1, FileSize, File);
 	Assert(ReadSize == FileSize);
 	fclose(File);
 
@@ -97,8 +97,7 @@ char* ReadFileContent(const char* Filename)
 	return(Content);
 }
 
-inline u8
-HexCharToByte(char C)
+u8 HexCharToByte(char C)
 {
 	if(C >= '0' && C <= '9')
 	{
@@ -116,8 +115,7 @@ HexCharToByte(char C)
 	return(0);
 }
 
-inline char
-ByteToBase64Char(u8 Byte)
+char ByteToBase64Char(u8 Byte)
 {
 	Assert(Byte < 64);
 	if(Byte < 26)
@@ -144,8 +142,8 @@ ByteToBase64Char(u8 Byte)
 	return(0);
 }
 
-internal char*
-HexToBase64(char* HexString, memory_index Length)
+// NOTE(hugo): returned string to be freed by user
+internal char* HexToBase64(const char* HexString, memory_index Length)
 {
 	// NOTE(hugo): Since 3 Hex outputs 2 Base64, we need
 	// to have a proper relation between the two.
@@ -170,8 +168,7 @@ HexToBase64(char* HexString, memory_index Length)
 	return(Result);
 }
 
-inline u8
-ByteFromTwoHex(char A, char B)
+u8 ByteFromTwoHex(char A, char B)
 {
 	u8 Top = HexCharToByte(A) << 4;
 	u8 Bottom = HexCharToByte(B) & 0x0F;
@@ -180,8 +177,7 @@ ByteFromTwoHex(char A, char B)
 
 // NOTE(hugo): This functions _always_
 // output lowercase for a->f
-inline char
-HexCharFromByte(u8 Byte)
+char HexCharFromByte(u8 Byte)
 {
 	Assert(Byte <= 0xF);
 	if(Byte < 10)
@@ -194,8 +190,7 @@ HexCharFromByte(u8 Byte)
 	}
 }
 
-inline void
-CharHexFromByte(u8 Byte, char* A, char* B)
+void CharHexFromByte(u8 Byte, char* A, char* B)
 {
 	u8 Top = Byte >> 4;
 	u8 Bottom = Byte & 0x0F;
@@ -203,8 +198,8 @@ CharHexFromByte(u8 Byte, char* A, char* B)
 	*B = HexCharFromByte(Bottom);
 }
 
-internal char*
-FixedXOR(char* InputA, char* InputB, memory_index Length)
+// NOTE(hugo): returned string to be freed by user
+internal char* FixedXOR(const char* InputA, const char* InputB, memory_index Length)
 {
 	char* Result = AllocateArray(char, Length + 1);
 	char* CharResult = Result;
@@ -228,8 +223,7 @@ FixedXOR(char* InputA, char* InputB, memory_index Length)
 	return(Result);
 }
 
-inline bool
-IsAlphanumerical(char C)
+bool IsAlphanumerical(char C)
 {
 	bool IsLetter = (C >= 'a' && C <= 'z') ||
 		(C >= 'A' && C <= 'Z');
@@ -237,15 +231,13 @@ IsAlphanumerical(char C)
 	return(IsLetter || IsNumber);
 }
 
-inline bool
-IsAlphabetical(char C)
+bool IsAlphabetical(char C)
 {
 	bool Result = (C >= 'a' && C <= 'z') || (C >= 'A' && C <= 'Z');
 	return(Result);
 }
 
-inline char
-ToLower(char C)
+char ToLower(char C)
 {
 	Assert(IsAlphabetical(C));
 	if(C >= 'A' && C <= 'Z')
@@ -256,8 +248,7 @@ ToLower(char C)
 	return(C);
 }
 
-inline bool
-IsEnglishCharacter(char C)
+bool IsEnglishCharacter(char C)
 {
 	return(IsAlphanumerical(C) || C == ' ');
 }
@@ -270,8 +261,7 @@ global_variable float EnglishLetterFrequency[26] =
     0.00978, 0.02360, 0.00150, 0.01974, 0.00074                     // V-Z
 };
 
-internal float
-XORCypher_ComputeScore(char* Str, memory_index Length, memory_index InputLength)
+internal float XORCypher_ComputeScore(const char* Str, memory_index Length, memory_index InputLength)
 {
 	float ChiSquare = 0.0f;
 
@@ -309,25 +299,24 @@ XORCypher_ComputeScore(char* Str, memory_index Length, memory_index InputLength)
 			}
 		}
 
-		float ExpectedCount = float(StrLetterSize) * EnglishLetterFrequency[LetterIndex];
-		ChiSquare += Square(float(ObservationCount) - ExpectedCount) / ExpectedCount;
+		float ExpectedCount = (float)(StrLetterSize) * EnglishLetterFrequency[LetterIndex];
+		ChiSquare += Square((float)(ObservationCount) - ExpectedCount) / ExpectedCount;
 	}
 
-	float t = (1.0f + float(BadLetter)) *
-		(1.0f + fabs(float(InputLength - Length))) * ChiSquare;
+	float t = (1.0f + (float)(BadLetter)) *
+		(1.0f + fabs((float)(InputLength - Length))) * ChiSquare;
 	float FinalScore = 1.0f / (1.0f + t);
 
 	return(FinalScore);
 }
 
-struct xor_decipher_result
+typedef struct xor_decipher_result
 {
 	float Score;
-	char* DecodedStr;
-};
+	char* DecodedStr; // NOTE(hugo): to be freed by the user
+} xor_decipher_result;
 
-internal xor_decipher_result
-SingleByteXORCypher(char* Input, memory_index Length)
+internal xor_decipher_result SingleByteXORCypher(const char* Input, memory_index Length)
 {
 	Assert(Length % 2 == 0);
 	xor_decipher_result Result = {};
@@ -363,17 +352,15 @@ SingleByteXORCypher(char* Input, memory_index Length)
 	return(Result);
 }
 
-inline bool
-IsEndLine(char* C)
+bool IsEndLine(const char* C)
 {
 	return((C && *C == '\r' && (C + 1) && C[1] == '\n') || (C && *C == '\n'));
 }
 
-inline memory_index
-GetLineLength(char* Str)
+memory_index GetLineLength(const char* Str)
 {
 	memory_index Result = 0;
-	char* C = Str;
+	const char* C = Str;
 	while(!IsEndLine(C))
 	{
 		++Result;
@@ -382,21 +369,25 @@ GetLineLength(char* Str)
 	return(Result);
 }
 
-internal char*
-DecryptFile(char* FileContent)
+// NOTE(hugo): returned string to be deleted by user
+internal const char* DecryptFile(const char* FileContent)
 {
-	char* CurrentFilePos = FileContent;
+	const char* CurrentFilePos = FileContent;
 	float BestScore = 0;
-	char* BestScoreResult = 0;
+	const char* BestScoreResult = 0;
 	while(*CurrentFilePos != 0)
 	{
-		memory_index LineLength = GetLineLength(CurrentFilePos);
-		xor_decipher_result DecipherResult = SingleByteXORCypher(CurrentFilePos, LineLength);
+		const memory_index LineLength = GetLineLength(CurrentFilePos);
+		const xor_decipher_result DecipherResult = SingleByteXORCypher(CurrentFilePos, LineLength);
 		if(BestScore < DecipherResult.Score)
 		{
 			BestScore = DecipherResult.Score;
 			BestScoreResult = DecipherResult.DecodedStr;
 		}
+        else
+        {
+            Free(DecipherResult.DecodedStr);
+        }
 
 		CurrentFilePos += (LineLength + 1);
 		if(*CurrentFilePos == '\n')
@@ -407,8 +398,8 @@ DecryptFile(char* FileContent)
 	return(BestScoreResult);
 }
 
-internal char*
-RepeatingKeyXOR(char* Input, memory_index Length, char* Key, memory_index KeyLength)
+// NOTE(hugo): returned string to be freed by user
+internal char* RepeatingKeyXOR(char* Input, memory_index Length, char* Key, memory_index KeyLength)
 {
 	char* Result = AllocateArray(char, 2 * Length + 1);
 	char* ResultC = Result;
@@ -431,39 +422,36 @@ RepeatingKeyXOR(char* Input, memory_index Length, char* Key, memory_index KeyLen
 	Assert(strlen(A) == strlen(B));\
 	Assert(strcmp((A), (B)) == 0);
 
-internal void
-Test_Set1_Challenge1()
+internal void Test_Set1_Challenge1()
 {
-	char* Input = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
+	const char* Input = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
 	memory_index Length = strlen(Input);
-	char* ExpectedResult = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
-	char* Result = HexToBase64(Input, Length);
+	const char* ExpectedResult = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
+	const char* Result = HexToBase64(Input, Length);
 
 	ASSERT_STR_IDENTICAL(Result, ExpectedResult);
 
 	Free(Result);
 }
 
-internal void
-Test_Set1_Challenge2()
+internal void Test_Set1_Challenge2()
 {
-	char* InputA = "1c0111001f010100061a024b53535009181c";
+	const char* InputA = "1c0111001f010100061a024b53535009181c";
 	memory_index Length = strlen(InputA);
-	char* InputB = "686974207468652062756c6c277320657965";
+	const char* InputB = "686974207468652062756c6c277320657965";
 	memory_index LengthB = strlen(InputB);
 	Assert(LengthB == Length);
-	char* Expected = "746865206b696420646f6e277420706c6179";
-	char* Result = FixedXOR(InputA, InputB, Length);
+	const char* Expected = "746865206b696420646f6e277420706c6179";
+	const char* Result = FixedXOR(InputA, InputB, Length);
 
 	ASSERT_STR_IDENTICAL(Result, Expected);
 
 	Free(Result);
 }
 
-internal void
-Test_Set1_Challenge3()
+internal void Test_Set1_Challenge3()
 {
-	char* Input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
+	const char* Input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
 	memory_index Length = strlen(Input);
 	xor_decipher_result Result = SingleByteXORCypher(Input, Length);
 	printf("Result of Set1/Challenge3: %s\n", Result.DecodedStr);
@@ -471,30 +459,28 @@ Test_Set1_Challenge3()
 	Free(Result.DecodedStr);
 }
 
-internal void
-Test_Set1_Challenge4()
+internal void Test_Set1_Challenge4()
 {
-	char* InputFilename = "../data/4.txt";
-	char* FileContent = ReadFileContent(InputFilename);
-	char* Result = DecryptFile(FileContent);
+	const char* InputFilename = "../data/4.txt";
+	const char* FileContent = ReadFileContent(InputFilename);
+	const char* Result = DecryptFile(FileContent);
 	Free(FileContent);
 	printf("Result of Set1/Challenge4: %s\n", Result);
+    Free(Result);
 
-	Free(Result);
 }
 
-internal void
-Test_Set1_Challenge5()
+internal void Test_Set1_Challenge5()
 {
-	char* Input = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+	const char* Input = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
 	memory_index Length = strlen(Input);
 
-	char* Key = "ICE";
+	const char* Key = "ICE";
 	memory_index KeyLength = strlen(Key);
 
-	char* Result = RepeatingKeyXOR(Input, Length, Key, KeyLength);
+	const char* Result = RepeatingKeyXOR(Input, Length, Key, KeyLength);
 
-	char* Expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+	const char* Expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
 
 	ASSERT_STR_IDENTICAL(Result, Expected);
 
